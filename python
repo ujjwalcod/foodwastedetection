@@ -1,0 +1,79 @@
+# ================================
+# 1. Install and Import Libraries
+# ================================
+!pip install tensorflow tensorflow-datasets --quiet
+
+import tensorflow as tf
+import tensorflow_datasets as tfds
+import matplotlib.pyplot as plt
+import numpy as np
+
+# ================================
+# 2. Load Dataset
+# (Example: Replace with food waste dataset link or custom folder later)
+# ================================
+dataset, info = tfds.load(
+    'cats_vs_dogs',  # Example dataset; replace with your dataset name
+    with_info=True,
+    as_supervised=True
+)
+
+train_dataset = dataset['train']
+
+# ================================
+# 3. Preprocess Function
+# ================================
+IMG_SIZE = (128, 128)
+
+def preprocess(image, label):
+    image = tf.image.resize(image, IMG_SIZE)
+    image = tf.cast(image, tf.float32) / 255.0
+    return image, label
+
+# Apply preprocessing
+train_dataset = train_dataset.map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+
+# Split dataset
+train_size = int(0.8 * info.splits['train'].num_examples)
+val_size = int(0.2 * info.splits['train'].num_examples)
+
+train_data = train_dataset.take(train_size).batch(32).prefetch(tf.data.AUTOTUNE)
+val_data = train_dataset.skip(train_size).take(val_size).batch(32).prefetch(tf.data.AUTOTUNE)
+
+# ================================
+# 4. Build Model
+# ================================
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(32, (3,3), activation='relu', input_shape=(128, 128, 3)),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Conv2D(64, (3,3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Conv2D(128, (3,3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(2, activation='softmax')  # 2 classes for cats vs dogs
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# ================================
+# 5. Train Model
+# ================================
+history = model.fit(
+    train_data,
+    validation_data=val_data,
+    epochs=5
+)
+
+# ================================
+# 6. Plot Accuracy and Loss
+# ================================
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.legend()
+plt.show()
